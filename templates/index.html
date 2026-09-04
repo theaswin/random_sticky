@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Notebook Sticky Notes</title>
+    <style>
+        :root {
+            --bg: #fff9e6;
+            --surface: #fffdf5;
+            --surface-soft: #fff7cc;
+            --yellow: #f4c430;
+            --yellow-dark: #b8860b;
+            --text: #302b1f;
+            --muted: #756d59;
+            --border: rgba(120, 96, 30, 0.14);
+            --shadow: 0 12px 35px rgba(100, 78, 15, 0.10);
+            --radius: 18px;
+            --regular-width: 180px;
+            --regular-height: 140px;
+            --large-width: 540px;
+            --large-height: 420px;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        body {
+            position: relative;
+            padding: 28px;
+            background:
+                radial-gradient(circle at 15% 10%, rgba(255, 224, 92, 0.22), transparent 30%),
+                radial-gradient(circle at 90% 90%, rgba(244, 196, 48, 0.14), transparent 30%),
+                var(--bg);
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background: linear-gradient(rgba(255,255,255,0.16), rgba(255,255,255,0.16));
+        }
+
+        .top-right-controls {
+            position: fixed;
+            top: 22px;
+            right: 30px;
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .board-heading-input {
+            width: 220px;
+            border: 1px solid rgba(120, 96, 30, 0.18);
+            border-radius: 12px;
+            background: rgba(255, 253, 245, 0.92);
+            color: var(--text);
+            padding: 10px 12px;
+            font-size: 14px;
+            font-weight: 600;
+            outline: none;
+            box-shadow: 0 6px 18px rgba(100, 78, 15, 0.06);
+        }
+
+        .clear-button {
+            border: 1px solid rgba(120, 96, 30, 0.16);
+            border-radius: 12px;
+            background: rgba(255, 253, 245, 0.92);
+            color: var(--text);
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 6px 18px rgba(100, 78, 15, 0.08);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        }
+
+        .clear-button:hover {
+            transform: translateY(-2px);
+            background: #fff9d9;
+            box-shadow: 0 9px 22px rgba(100, 78, 15, 0.12);
+        }
+
+        .plan-header {
+            position: relative;
+            z-index: 1;
+            max-width: 720px;
+            margin: 4px 0 0 4px;
+        }
+
+        .eyebrow {
+            display: inline-block;
+            margin-bottom: 8px;
+            padding: 5px 10px;
+            border-radius: 999px;
+            background: #fff0a6;
+            color: #80630c;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.14em;
+        }
+
+        .plan-header h1 {
+            margin: 0;
+            font-size: clamp(30px, 4vw, 46px);
+            line-height: 1.05;
+            letter-spacing: -0.04em;
+        }
+
+        .plan-header p {
+            margin: 10px 0 0;
+            color: var(--muted);
+            font-size: 14px;
+            max-width: 560px;
+        }
+
+        .sticky-note {
+            --offset-x: 0px;
+            --offset-y: 0px;
+            position: absolute;
+            width: var(--large-width);
+            min-height: var(--large-height);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: rgba(255, 253, 245, 0.96);
+            box-shadow: var(--shadow);
+            transform: translate(var(--offset-x), var(--offset-y));
+            user-select: none;
+            display: flex;
+            flex-direction: column;
+            cursor: default;
+            transition: box-shadow 0.2s ease, transform 0.2s ease, left 0.2s ease, top 0.2s ease;
+            overflow: hidden;
+        }
+
+        .sticky-note:hover {
+            box-shadow: 0 18px 45px rgba(100, 78, 15, 0.15);
+        }
+
+        .sticky-note.small-note {
+            width: var(--regular-width) !important;
+            min-height: var(--regular-height) !important;
+            height: var(--regular-height) !important;
+        }
+
+        .sticky-note.checked {
+            z-index: 1000;
+            width: 220px !important;
+            min-height: 42px !important;
+            height: 42px !important;
+            overflow: hidden;
+            box-shadow: 0 20px 48px rgba(100, 78, 15, 0.18);
+        }
+
+        .sticky-note.checked .sticky-body,
+        .sticky-note.checked .note-actions,
+        .sticky-note.checked .resize-handle {
+            display: none !important;
+        }
+
+        .sticky-note.checked .sticky-header {
+            min-height: 42px;
+            border-radius: 12px;
+        }
+
+        .sticky-note.checked.is-front {
+            min-height: 150px !important;
+            height: auto !important;
+            overflow: visible;
+        }
+
+        .sticky-note.checked.is-front .sticky-body,
+        .sticky-note.checked.is-front .note-actions {
+            display: flex !important;
+        }
+
+        .sticky-note .sticky-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 54px;
+            padding: 10px 14px;
+            background: linear-gradient(135deg, #fff1a8, #f8d94e);
+            border-radius: var(--radius) var(--radius) 0 0;
+        }
+
+        .sticky-note .check-box {
+            width: 17px;
+            height: 17px;
+            margin: 0;
+            border: 0;
+            accent-color: #c59b16;
+            cursor: pointer;
+        }
+
+        .sticky-note .note-title-input {
+            flex: 1;
+            min-width: 0;
+            border: none;
+            background: transparent;
+            color: var(--text);
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            outline: none;
+            padding: 0;
+        }
+
+        .sticky-body {
+            display: flex;
+            flex: 1;
+            flex-direction: column;
+            min-height: 50px;
+            background: rgba(255, 251, 221, 0.4);
+        }
+
+        .sticky-note .sticky-content {
+            width: 100%;
+            flex: 1;
+            min-height: 82px;
+            padding: 16px 18px 18px;
+            font-size: 14px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            color: var(--text);
+            outline: none;
+            border: none;
+            background: transparent;
+            font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+            resize: none;
+        }
+
+        .sticky-note .sticky-content:focus {
+            background: rgba(255, 248, 204, 0.45);
+        }
+
+        .sticky-note .note-actions {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 8px;
+            padding: 0 12px 12px;
+            background: rgba(255, 250, 220, 0.3);
+        }
+
+        .mini-action-btn {
+            border: 1px solid rgba(120, 96, 30, 0.18);
+            border-radius: 9px;
+            padding: 7px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            background: rgba(255, 253, 245, 0.92);
+            color: var(--text);
+        }
+
+        .mini-action-btn.delete-btn {
+            color: #7a3d2d;
+        }
+
+        .sticky-note .sticky-handle {
+            position: absolute;
+            top: 10px;
+            right: 12px;
+            width: 20px;
+            height: 20px;
+            border: 0;
+            background: radial-gradient(circle, rgba(75, 61, 22, 0.45) 2px, transparent 2.5px);
+            background-size: 7px 7px;
+            cursor: move;
+            opacity: 0.65;
+        }
+
+        .sticky-note .resize-handle {
+            position: absolute;
+            right: 5px;
+            bottom: 5px;
+            width: 18px;
+            height: 18px;
+            border: 0;
+            background:
+                linear-gradient(135deg, transparent 45%, rgba(120, 96, 30, 0.35) 46%, rgba(120, 96, 30, 0.35) 52%, transparent 53%),
+                linear-gradient(135deg, transparent 60%, rgba(120, 96, 30, 0.35) 61%, rgba(120, 96, 30, 0.35) 67%, transparent 68%);
+            cursor: nwse-resize;
+            opacity: 0.7;
+        }
+
+        .checked-notes-popup {
+            position: fixed;
+            z-index: 3000;
+            width: 280px;
+            max-height: 320px;
+            overflow: auto;
+            padding: 10px 12px 12px;
+            border: 1px solid rgba(120, 96, 30, 0.18);
+            border-radius: 14px;
+            background: rgba(255, 253, 245, 0.98);
+            box-shadow: 0 20px 50px rgba(100, 78, 15, 0.15);
+            display: none;
+        }
+
+        .checked-notes-popup.visible {
+            display: block;
+        }
+
+        .checked-notes-popup h3 {
+            margin: 0 0 8px;
+            font-size: 13px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #6b5520;
+        }
+
+        .checked-note-item {
+            padding: 8px 10px;
+            border-radius: 10px;
+            background: rgba(251, 244, 197, 0.6);
+            margin-bottom: 6px;
+            border: 1px solid rgba(120, 96, 30, 0.08);
+        }
+
+        .checked-note-item strong {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 12px;
+        }
+
+        .checked-note-item span {
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            line-height: 1.4;
+        }
+
+        .trash-zone {
+            position: fixed;
+            right: 26px;
+            bottom: 24px;
+            z-index: 2200;
+            width: 90px;
+            height: 90px;
+            border-radius: 18px;
+            border: 2px dashed rgba(120, 96, 30, 0.34);
+            background: rgba(255, 253, 245, 0.7);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            color: #6b5520;
+            font-size: 11px;
+            font-weight: 700;
+            box-shadow: 0 14px 32px rgba(100, 78, 15, 0.08);
+        }
+
+        .trash-zone .trash-icon {
+            font-size: 28px;
+        }
+
+        .sticky-note.to-trash {
+            transition: transform 0.4s ease, opacity 0.4s ease;
+            transform: translate(var(--trash-x), var(--trash-y)) scale(0.1) !important;
+            opacity: 0.08;
+        }
+    </style>
+</head>
+<body>
+    <header class="plan-header">
+        <div>
+            <div class="eyebrow">PLANNING BOARD</div>
+            <h1 id="boardTitleDisplay">My Plan</h1>
+            <p>Organize your tasks, ideas, and priorities in one clean workspace.</p>
+        </div>
+    </header>
+
+    <div class="top-right-controls">
+        <input id="boardHeadingInput" class="board-heading-input" type="text" value="My Plan" placeholder="Add heading" aria-label="Board heading">
+        <button class="clear-button" type="button" id="clearNotesBtn">Clear all</button>
+    </div>
+
+    <div id="checkedNotesPopup" class="checked-notes-popup" aria-live="polite"></div>
+
+    <div class="trash-zone" aria-label="Trash bin">
+        <div class="trash-icon">🗑</div>
+        <div>Trash</div>
+    </div>
+
+    <script>
+        const notesData = {{ notes | tojson }};
+        const DEFAULT_NOTE_WIDTH = 540;
+        const DEFAULT_NOTE_HEIGHT = 420;
+        const REGULAR_NOTE_WIDTH = 180;
+        const REGULAR_NOTE_HEIGHT = 140;
+
+        function openCheckedNotesPopup(anchorNote) {
+            const checkedNotes = Array.from(document.querySelectorAll('.sticky-note')).filter(
+                (note) => note.querySelector('.check-box').checked
+            );
+
+            if (!checkedNotes.length) return;
+
+            const popup = document.getElementById('checkedNotesPopup');
+            popup.innerHTML = '<h3>Checked notes</h3>' + checkedNotes.map((note) => {
+                const titleInput = note.querySelector('.note-title-input');
+                const title = (titleInput && titleInput.value.trim()) || 'Untitled';
+                const textarea = note.querySelector('.sticky-content');
+                const text = (textarea ? textarea.value || textarea.textContent : '').trim();
+                const snippet = text ? text.slice(0, 90) : 'No details yet';
+                return '<div class="checked-note-item"><strong>' + title + '</strong><span>' + snippet + '</span></div>';
+            }).join('');
+
+            const rect = anchorNote.getBoundingClientRect();
+            const left = Math.min(window.innerWidth - 300, rect.right + 16);
+            const top = Math.max(20, rect.top);
+            popup.style.left = left + 'px';
+            popup.style.top = top + 'px';
+            popup.classList.add('visible');
+        }
+
+        function hideCheckedNotesPopup() {
+            document.getElementById('checkedNotesPopup').classList.remove('visible');
+        }
+
+        function getNoteStyles(note) {
+            return {
+                left: note.x + 'px',
+                top: note.y + 'px',
+                width: note.width + 'px',
+                minHeight: note.height + 'px',
+                '--rotation': note.rotation + 'deg'
+            };
+        }
+
+        function serializeNote(noteEl) {
+            const titleInput = noteEl.querySelector('.note-title-input');
+            const content = noteEl.querySelector('.sticky-content');
+            return {
+                title: titleInput ? titleInput.value : '',
+                text: content ? content.value || content.textContent : '',
+                x: Math.round(noteEl.offsetLeft),
+                y: Math.round(noteEl.offsetTop),
+                width: Math.round(noteEl.offsetWidth),
+                height: Math.round(noteEl.offsetHeight),
+                checked: noteEl.querySelector('.check-box').checked ? 1 : 0,
+                rotation: parseFloat(getComputedStyle(noteEl).getPropertyValue('--rotation') || 0)
+            };
+        }
+
+        function placeCheckedNotes(activeNote = null) {
+            const buttonRect = document.querySelector('.clear-button')?.getBoundingClientRect();
+            const buttonBottom = buttonRect ? buttonRect.bottom + 18 : 94;
+            const rightMargin = 30;
+            const gap = 12;
+            const compactHeight = 42;
+
+            let checkedNotes = Array.from(document.querySelectorAll('.sticky-note')).filter(
+                (note) => note.querySelector('.check-box').checked
+            );
+
+            if (activeNote) {
+                const activeIndex = checkedNotes.findIndex((note) => note === activeNote);
+                if (activeIndex > -1) {
+                    const [movedNote] = checkedNotes.splice(activeIndex, 1);
+                    checkedNotes.push(movedNote);
+                }
+            }
+
+            const frontIndex = activeNote ? checkedNotes.length - 1 : 0;
+
+            checkedNotes.forEach((note, index) => {
+                const isFront = index === frontIndex;
+                note.style.width = '220px';
+                note.style.minHeight = isFront ? '150px' : compactHeight + 'px';
+                note.style.height = isFront ? 'auto' : compactHeight + 'px';
+                note.style.left = (window.innerWidth - 220 - rightMargin) + 'px';
+                note.style.top = (buttonBottom + index * gap) + 'px';
+                note.style.zIndex = String(100 + index);
+                note.classList.add('checked');
+                note.classList.toggle('is-front', isFront);
+            });
+
+            Array.from(document.querySelectorAll('.sticky-note')).filter(
+                (note) => !note.querySelector('.check-box').checked
+            ).forEach((note) => {
+                note.classList.remove('checked');
+                note.classList.remove('is-front');
+            });
+        }
+
+        function persistNote(noteEl) {
+            const id = noteEl.dataset.id;
+            const payload = serializeNote(noteEl);
+            fetch('/notes/' + id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).catch(() => {});
+        }
+
+        function setNoteSize(noteEl, size) {
+            if (size === 'small') {
+                noteEl.classList.remove('large-note');
+                noteEl.classList.add('small-note');
+                noteEl.style.width = REGULAR_NOTE_WIDTH + 'px';
+                noteEl.style.minHeight = REGULAR_NOTE_HEIGHT + 'px';
+                noteEl.style.height = REGULAR_NOTE_HEIGHT + 'px';
+                noteEl.dataset.size = 'small';
+            } else {
+                noteEl.classList.remove('small-note');
+                noteEl.classList.add('large-note');
+                noteEl.style.width = DEFAULT_NOTE_WIDTH + 'px';
+                noteEl.style.minHeight = DEFAULT_NOTE_HEIGHT + 'px';
+                noteEl.style.height = DEFAULT_NOTE_HEIGHT + 'px';
+                noteEl.dataset.size = 'large';
+            }
+        }
+
+        function deleteNoteToTrash(noteEl) {
+            const rect = noteEl.getBoundingClientRect();
+            const trash = document.querySelector('.trash-zone').getBoundingClientRect();
+            const dx = trash.left + trash.width / 2 - rect.left - rect.width / 2;
+            const dy = trash.top + trash.height / 2 - rect.top - rect.height / 2;
+
+            noteEl.style.setProperty('--trash-x', dx + 'px');
+            noteEl.style.setProperty('--trash-y', dy + 'px');
+            noteEl.classList.add('to-trash');
+
+            setTimeout(() => {
+                const id = noteEl.dataset.id;
+                fetch('/notes/' + id, { method: 'DELETE' }).catch(() => {});
+                noteEl.remove();
+            }, 420);
+        }
+
+        function createStickyNoteFromData(note) {
+            const noteEl = document.createElement('div');
+            noteEl.className = 'sticky-note';
+            noteEl.dataset.id = note.id;
+            noteEl.dataset.size = (note.width && note.width <= REGULAR_NOTE_WIDTH + 40) ? 'small' : 'large';
+            Object.assign(noteEl.style, getNoteStyles(note));
+            noteEl.style.zIndex = String(10 + document.querySelectorAll('.sticky-note').length);
+
+            const header = document.createElement('div');
+            header.className = 'sticky-header';
+
+            const checkBox = document.createElement('input');
+            checkBox.type = 'checkbox';
+            checkBox.className = 'check-box';
+            checkBox.checked = !!Number(note.checked);
+            checkBox.title = 'Check to overlap note';
+
+            const titleInput = document.createElement('input');
+            titleInput.type = 'text';
+            titleInput.className = 'note-title-input';
+            titleInput.value = note.title || '';
+            titleInput.placeholder = 'Title';
+
+            const handle = document.createElement('div');
+            handle.className = 'sticky-handle';
+
+            const resizeHandle = document.createElement('div');
+            resizeHandle.className = 'resize-handle';
+
+            const body = document.createElement('div');
+            body.className = 'sticky-body';
+
+            const content = document.createElement('textarea');
+            content.className = 'sticky-content';
+            content.value = note.text || '';
+            content.placeholder = 'Write something...';
+
+            const actions = document.createElement('div');
+            actions.className = 'note-actions';
+
+            const regularButton = document.createElement('button');
+            regularButton.type = 'button';
+            regularButton.className = 'mini-action-btn';
+            regularButton.textContent = 'Regular';
+
+            const deleteButton = document.createElement('button');
+            deleteButton.type = 'button';
+            deleteButton.className = 'mini-action-btn delete-btn';
+            deleteButton.textContent = 'Delete';
+
+            actions.appendChild(regularButton);
+            actions.appendChild(deleteButton);
+            body.appendChild(content);
+            header.appendChild(checkBox);
+            header.appendChild(titleInput);
+            noteEl.appendChild(header);
+            noteEl.appendChild(handle);
+            noteEl.appendChild(body);
+            noteEl.appendChild(actions);
+            noteEl.appendChild(resizeHandle);
+            document.body.appendChild(noteEl);
+
+            if (noteEl.dataset.size === 'small') {
+                setNoteSize(noteEl, 'small');
+            } else {
+                setNoteSize(noteEl, 'large');
+            }
+
+            if (checkBox.checked) {
+                noteEl.classList.add('checked');
+                placeCheckedNotes();
+            }
+
+            let dragState = null;
+            let resizeState = null;
+
+            function beginDrag(event) {
+                if (event.target !== handle) return;
+                if (checkBox.checked) return;
+                event.preventDefault();
+                dragState = {
+                    offsetX: event.clientX - noteEl.offsetLeft,
+                    offsetY: event.clientY - noteEl.offsetTop
+                };
+            }
+
+            function onMove(event) {
+                if (dragState) {
+                    noteEl.style.left = (event.clientX - dragState.offsetX) + 'px';
+                    noteEl.style.top = (event.clientY - dragState.offsetY) + 'px';
+                    persistNote(noteEl);
+                }
+
+                if (resizeState && !checkBox.checked) {
+                    const newWidth = Math.max(180, resizeState.startWidth + (event.clientX - resizeState.startX));
+                    const newHeight = Math.max(140, resizeState.startHeight + (event.clientY - resizeState.startY));
+                    noteEl.style.width = newWidth + 'px';
+                    noteEl.style.minHeight = newHeight + 'px';
+                    noteEl.style.height = newHeight + 'px';
+                    persistNote(noteEl);
+                }
+            }
+
+            function endDrag() {
+                dragState = null;
+                resizeState = null;
+                persistNote(noteEl);
+            }
+
+            function beginResize(event) {
+                if (checkBox.checked || event.target !== resizeHandle) return;
+                event.preventDefault();
+                resizeState = {
+                    startX: event.clientX,
+                    startY: event.clientY,
+                    startWidth: noteEl.offsetWidth,
+                    startHeight: noteEl.offsetHeight
+                };
+            }
+
+            titleInput.addEventListener('input', function() { persistNote(noteEl); });
+            content.addEventListener('input', function() { persistNote(noteEl); });
+
+            checkBox.addEventListener('change', function() {
+                noteEl.classList.toggle('checked', checkBox.checked);
+                if (checkBox.checked) {
+                    const checkedNotes = Array.from(document.querySelectorAll('.sticky-note')).filter(
+                        (note) => note.querySelector('.check-box').checked
+                    );
+                    const currentOrder = checkedNotes.indexOf(noteEl);
+                    if (currentOrder > -1) {
+                        checkedNotes.splice(currentOrder, 1);
+                    }
+                    checkedNotes.push(noteEl);
+                    placeCheckedNotes();
+                } else {
+                    noteEl.classList.remove('checked');
+                    noteEl.style.width = REGULAR_NOTE_WIDTH + 'px';
+                    noteEl.style.minHeight = REGULAR_NOTE_HEIGHT + 'px';
+                    noteEl.style.height = REGULAR_NOTE_HEIGHT + 'px';
+                    placeCheckedNotes();
+                }
+                persistNote(noteEl);
+            });
+
+            noteEl.addEventListener('mouseenter', function(event) {
+                if (checkBox.checked && event.target !== checkBox) {
+                    placeCheckedNotes(noteEl);
+                    openCheckedNotesPopup(noteEl);
+                }
+            });
+
+            noteEl.addEventListener('mouseleave', hideCheckedNotesPopup);
+
+            regularButton.addEventListener('click', function() {
+                setNoteSize(noteEl, 'small');
+                persistNote(noteEl);
+            });
+
+            deleteButton.addEventListener('click', function() {
+                deleteNoteToTrash(noteEl);
+            });
+
+            handle.addEventListener('pointerdown', beginDrag);
+            resizeHandle.addEventListener('pointerdown', beginResize);
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', endDrag);
+            window.addEventListener('pointercancel', endDrag);
+
+            return noteEl;
+        }
+
+        function createStickyNote(x, y, text = 'New note') {
+            const payload = {
+                title: '',
+                text,
+                x,
+                y,
+                width: DEFAULT_NOTE_WIDTH,
+                height: DEFAULT_NOTE_HEIGHT,
+                checked: false,
+                rotation: Math.random() * 8 - 4
+            };
+
+            fetch('/notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    createStickyNoteFromData({
+                        id: data.id,
+                        title: data.title || '',
+                        text: data.text,
+                        x: data.x,
+                        y: data.y,
+                        width: data.width,
+                        height: data.height,
+                        checked: data.checked,
+                        rotation: data.rotation
+                    });
+                })
+                .catch(() => {});
+        }
+
+        const boardHeadingInput = document.getElementById('boardHeadingInput');
+        const boardTitleDisplay = document.getElementById('boardTitleDisplay');
+        const storedHeading = localStorage.getItem('boardHeading') || 'My Plan';
+        boardHeadingInput.value = storedHeading;
+        boardTitleDisplay.textContent = storedHeading;
+
+        boardHeadingInput.addEventListener('input', function() {
+            const value = this.value.trim() || 'My Plan';
+            localStorage.setItem('boardHeading', value);
+            boardTitleDisplay.textContent = value;
+        });
+
+        document.addEventListener('dblclick', function(event) {
+            if (event.target.closest('.sticky-note')) return;
+            const x = event.clientX - 140;
+            const y = event.clientY - 120;
+            createStickyNote(x, y);
+        });
+
+        document.getElementById('clearNotesBtn').addEventListener('click', function() {
+            fetch('/notes/clear', { method: 'POST' })
+                .then(() => {
+                    document.querySelectorAll('.sticky-note').forEach((note) => note.remove());
+                    hideCheckedNotesPopup();
+                })
+                .catch(() => {});
+        });
+
+        notesData.forEach((note) => {
+            createStickyNoteFromData(note);
+        });
+
+        setTimeout(() => placeCheckedNotes(), 120);
+    </script>
+</body>
+</html>
